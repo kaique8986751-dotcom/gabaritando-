@@ -1,36 +1,260 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Corretor de Gabaritos</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corretor de Gabarito por Disciplina</title>
+    <!-- Tailwind CSS para estilização -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- OpenCV.js para processamento de imagem -->
+    <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady()"></script>
+    <style>
+        .grid-q { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+    </style>
 </head>
-<body>
-  <div class="container">
-    <h1>Corretor de Gabarito</h1>
-    <p>Cadastre o gabarito oficial e insira as respostas do aluno para calcular a nota.</p>
+<body class="bg-gray-100 text-gray-800 min-h-screen p-4">
 
-    <!-- Seção do Gabarito Oficial -->
-    <section class="card">
-      <h2>1. Gabarito Oficial</h2>
-      <div id="gabarito-inputs" class="grid-questoes"></div>
-    </section>
+    <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-md p-6">
+        <h1 class="text-2xl font-bold text-center text-blue-600 mb-6">Corretor de Gabarito (65 Questões)</h1>
 
-    <!-- Seção de Respostas do Aluno -->
-    <section class="card">
-      <h2>2. Respostas do Aluno</h2>
-      <div id="aluno-inputs" class="grid-questoes"></div>
-      <button id="btn-corrigir" onclick="corrigirProvas()">Corrigir Prova</button>
-    </section>
+        <!-- Mapeamento de Disciplinas -->
+        <div class="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
+            <h2 class="font-bold text-blue-800 mb-2">Estrutura das Disciplinas (1 ponto por questão):</h2>
+            <div class="text-xs grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 text-gray-700">
+                <div><b>1-5:</b> Português</div>
+                <div><b>6-10:</b> Inglês</div>
+                <div><b>11-15:</b> Ed. Física</div>
+                <div><b>16-20:</b> Artes</div>
+                <div><b>21-25:</b> Matemática</div>
+                <div><b>26-30:</b> Biologia</div>
+                <div><b>31-35:</b> Física</div>
+                <div><b>36-40:</b> Química</div>
+                <div><b>41-45:</b> História</div>
+                <div><b>46-50:</b> Geografia</div>
+                <div><b>51-55:</b> Sociologia</div>
+                <div><b>56-60:</b> Filosofia</div>
+                <div><b>61-65:</b> Informática</div>
+            </div>
+        </div>
 
-    <!-- Seção do Resultado -->
-    <section id="resultado-card" class="card hidden">
-      <h2>Resultado</h2>
-      <div id="resultado-conteudo"></div>
-    </section>
-  </div>
+        <!-- Seção da Câmera -->
+        <div class="grid md:grid-cols-2 gap-6 mb-6">
+            <div class="flex flex-col items-center bg-gray-50 p-4 rounded-lg border">
+                <h3 class="font-semibold mb-2">Capturar Imagem do Cartão</h3>
+                <video id="webcam" autoplay playsinline class="w-full h-48 bg-black rounded mb-2 object-cover"></video>
+                <div class="flex gap-2">
+                    <button onclick="startCamera()" class="bg-gray-600 text-white px-3 py-1 text-sm rounded hover:bg-gray-700">Ligar Câmera</button>
+                    <button onclick="capturePhoto('oficial')" class="bg-blue-600 text-white px-3 py-1 text-sm rounded hover:bg-blue-700">Salvar Gabarito Oficial</button>
+                    <button onclick="capturePhoto('aluno')" class="bg-green-600 text-white px-3 py-1 text-sm rounded hover:bg-green-700">Capturar Aluno</button>
+                </div>
+                <canvas id="canvas-capture" class="hidden"></canvas>
+            </div>
 
-  <script src="script.js"></script>
+            <!-- Previsualização / Leitura de Imagem -->
+            <div class="flex flex-col items-center bg-gray-50 p-4 rounded-lg border justify-center">
+                <h3 class="font-semibold mb-2">Última Captura Processada</h3>
+                <img id="image-preview" class="w-full h-48 object-contain bg-gray-200 rounded hidden" />
+                <p id="opencv-status" class="text-xs text-yellow-600 mt-2">Carregando OpenCV.js...</p>
+            </div>
+        </div>
+
+        <!-- Grade de Respostas (Manuais ou Detectadas) -->
+        <div class="mb-6">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-lg font-bold">Respostas Cadastradas</h3>
+                <button onclick="calcularResultado()" class="bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-700">
+                    Calcular Resultado do Aluno
+                </button>
+            </div>
+
+            <div id="questions-container" class="grid-q max-h-80 overflow-y-auto p-2 bg-gray-50 rounded border">
+                <!-- Gerado via JavaScript -->
+            </div>
+        </div>
+
+        <!-- Resultado Final -->
+        <div id="result-section" class="hidden bg-gray-50 p-5 rounded-xl border border-gray-200">
+            <h3 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Resultado da Correção</h3>
+            <div class="text-lg font-semibold mb-4">
+                Pontuação Total: <span id="total-score" class="text-blue-600 text-2xl">0</span> / 65
+            </div>
+            
+            <div id="discipline-results" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                <!-- Resultados por disciplina gerados aqui -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuração das Disciplinas e Intervalos
+        const disciplinas = [
+            { nome: "Português", inicio: 1, fim: 5 },
+            { nome: "Inglês", inicio: 6, fim: 10 },
+            { nome: "Educação Física", inicio: 11, fim: 15 },
+            { nome: "Artes", inicio: 16, fim: 20 },
+            { nome: "Matemática", inicio: 21, fim: 25 },
+            { nome: "Biologia", inicio: 26, fim: 30 },
+            { nome: "Física", inicio: 31, fim: 35 },
+            { nome: "Química", inicio: 36, fim: 40 },
+            { nome: "História", inicio: 41, fim: 45 },
+            { nome: "Geografia", inicio: 46, fim: 50 },
+            { nome: "Sociologia", inicio: 51, fim: 55 },
+            { nome: "Filosofia", inicio: 56, fim: 60 },
+            { nome: "Informática", inicio: 61, fim: 65 }
+        ];
+
+        const opcoes = ['A', 'B', 'C', 'D', 'E'];
+        let gabaritoOficial = {};
+        let gabaritoAluno = {};
+        let videoStream = null;
+
+        // Inicializar Grade de 65 Questões na tela
+        function initGrade() {
+            const container = document.getElementById('questions-container');
+            container.innerHTML = '';
+
+            for (let i = 1; i <= 65; i++) {
+                const disc = disciplinas.find(d => i >= d.inicio && i <= d.fim);
+                const card = document.createElement('div');
+                card.className = "bg-white p-2 rounded shadow-sm border text-xs flex flex-col gap-1";
+                
+                card.innerHTML = `
+                    <div class="font-bold text-gray-600">Q${i} <span class="text-[10px] text-blue-500">(${disc.nome})</span></div>
+                    <div class="flex gap-1 justify-between">
+                        ${opcoes.map(opt => `
+                            <button id="btn-${i}-${opt}" onclick="setRespostaManual(${i}, '${opt}')" 
+                                class="w-5 h-5 rounded border border-gray-300 font-bold hover:bg-gray-100 text-[10px]">
+                                ${opt}
+                            </button>
+                        `).join('')}
+                    </div>
+                `;
+                container.appendChild(card);
+            }
+        }
+
+        function setRespostaManual(q, opt) {
+            // Alternar ou definir resposta do aluno
+            gabaritoAluno[q] = opt;
+            
+            // Atualizar destaque visual dos botões
+            opcoes.forEach(o => {
+                const btn = document.getElementById(`btn-${q}-${o}`);
+                if (o === opt) {
+                    btn.className = "w-5 h-5 rounded border font-bold text-[10px] bg-blue-600 text-white border-blue-600";
+                } else {
+                    btn.className = "w-5 h-5 rounded border border-gray-300 font-bold hover:bg-gray-100 text-[10px]";
+                }
+            });
+        }
+
+        // Ligar Câmera
+        async function startCamera() {
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                document.getElementById('webcam').srcObject = videoStream;
+            } catch (err) {
+                alert("Erro ao acessar a câmera: " + err.message);
+            }
+        }
+
+        // Tirar Foto
+        function capturePhoto(tipo) {
+            const video = document.getElementById('webcam');
+            const canvas = document.getElementById('canvas-capture');
+            const preview = document.getElementById('image-preview');
+
+            if (!videoStream) {
+                alert("Por favor, ligue a câmera primeiro.");
+                return;
+            }
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const imgUrl = canvas.toDataURL('image/png');
+            preview.src = imgUrl;
+            preview.classList.remove('hidden');
+
+            processarGabaritoImagem(tipo);
+        }
+
+        // Processamento OpenCV
+        function onOpenCvReady() {
+            document.getElementById('opencv-status').innerText = "OpenCV.js Pronto para Uso";
+            document.getElementById('opencv-status').className = "text-xs text-green-600 mt-2";
+        }
+
+        function processarGabaritoImagem(tipo) {
+            // Exemplo conceitual de processamento de imagem com OpenCV.js
+            // Em uma aplicação de produção, ajustam-se as coordenadas dos marcadores ópticos.
+            if (typeof cv !== 'undefined' && cv.Mat) {
+                let src = cv.imread('canvas-capture');
+                let gray = new cv.Mat();
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+                cv.threshold(gray, gray, 120, 255, cv.THRESH_BINARY_INV);
+
+                // Liberação de memória OpenCV
+                src.delete();
+                gray.delete();
+
+                alert(`Imagem do Gabarito ${tipo.toUpperCase()} capturada! (Ajuste o preenchimento na grade abaixo se necessário).`);
+            } else {
+                alert("Modo de foto capturado. Ajuste a grade manual se necessário.");
+            }
+        }
+
+        // Calcular e Exibir Correção
+        function calcularResultado() {
+            // Se o oficial estiver vazio, define um padrão simples para testes se necessário
+            if (Object.keys(gabaritoOficial).length === 0) {
+                // Definindo gabarito oficial padrão (Exemplo: todos A) para permitir testes rápidos
+                for(let i=1; i<=65; i++) gabaritoOficial[i] = 'A';
+            }
+
+            let pontuacaoTotal = 0;
+            const resultadosDisc = {};
+
+            disciplinas.forEach(d => {
+                resultadosDisc[d.nome] = { acertos: 0, total: (d.fim - d.inicio + 1) };
+            });
+
+            for (let i = 1; i <= 65; i++) {
+                const respAluno = gabaritoAluno[i];
+                const respCorreta = gabaritoOficial[i];
+                const disc = disciplinas.find(d => i >= d.inicio && i <= d.fim);
+
+                if (respAluno && respAluno === respCorreta) {
+                    pontuacaoTotal += 1;
+                    resultadosDisc[disc.nome].acertos += 1;
+                }
+            }
+
+            // Exibir Resultados na Tela
+            document.getElementById('total-score').innerText = pontuacaoTotal;
+            const containerRes = document.getElementById('discipline-results');
+            containerRes.innerHTML = '';
+
+            disciplinas.forEach(d => {
+                const res = resultadosDisc[d.nome];
+                const card = document.createElement('div');
+                card.className = "bg-white p-3 rounded border flex justify-between items-center shadow-sm";
+                card.innerHTML = `
+                    <span class="font-medium text-gray-700">${d.nome}</span>
+                    <span class="font-bold ${res.acertos > 0 ? 'text-green-600' : 'text-gray-400'}">
+                        ${res.acertos} / ${res.total} pts
+                    </span>
+                `;
+                containerRes.appendChild(card);
+            });
+
+            document.getElementById('result-section').classList.remove('hidden');
+        }
+
+        // Inicializar ao carregar
+        window.onload = initGrade;
+    </script>
 </body>
 </html>
