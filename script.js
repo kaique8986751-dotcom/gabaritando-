@@ -224,4 +224,4 @@ function corrigirGabarito() {
   document.getElementById('resultado-conteudo').innerHTML = htmlResultado;
   resultadoCard.classList.remove('hidden');
   resultadoCard.scrollIntoView({ behavior: 'smooth' });
-}
+} 
