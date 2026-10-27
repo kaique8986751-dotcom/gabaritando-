@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Corretor de Gabaritos</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Corretor de Gabarito</h1>
+    <p>Cadastre o gabarito oficial e insira as respostas do aluno para calcular a nota.</p>
+
+    <!-- Seção do Gabarito Oficial -->
+    <section class="card">
+      <h2>1. Gabarito Oficial</h2>
+      <div id="gabarito-inputs" class="grid-questoes"></div>
+    </section>
+
+    <!-- Seção de Respostas do Aluno -->
+    <section class="card">
+      <h2>2. Respostas do Aluno</h2>
+      <div id="aluno-inputs" class="grid-questoes"></div>
+      <button id="btn-corrigir" onclick="corrigirProvas()">Corrigir Prova</button>
+    </section>
+
+    <!-- Seção do Resultado -->
+    <section id="resultado-card" class="card hidden">
+      <h2>Resultado</h2>
+      <div id="resultado-conteudo"></div>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
